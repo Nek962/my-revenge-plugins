@@ -8,6 +8,7 @@ const AUDIO_MODULE_CANDIDATES = [
   "DCAudioManager",
   "DiscordAudioManager",
   "RNAudioManager",
+  "RTNAudioManager" // Добавлено для новых версий Discord (TurboModules)
 ];
 
 const METHODS_TO_BLOCK = [
@@ -32,7 +33,7 @@ function discoverAndPatch() {
 
   const candidates = new Set(AUDIO_MODULE_CANDIDATES);
 
-  // Scan all modules for audio methods
+  // Ищем модули по сигнатурам
   for (const key of Object.keys(NativeModules)) {
     const mod = NativeModules[key];
     if (mod && METHODS_TO_BLOCK.some((m) => typeof mod[m] === "function")) {
@@ -47,32 +48,46 @@ function discoverAndPatch() {
     for (const method of METHODS_TO_BLOCK) {
       if (typeof mod[method] !== "function") continue;
 
-      const original = mod[method].bind(mod);
+      const original = mod[method];
 
-      mod[method] = function (...args) {
-        // setMode: only block MODE_IN_COMMUNICATION (3), pass others through
-        if (method === "setMode" && args[0] !== 3) {
-          return original(...args);
-        }
-        log("Blocked " + moduleName + "." + method + "(" + args.join(", ") + ")");
-        return undefined;
-      };
+      try {
+        // Переопределяем свойство жестко через дескриптор, 
+        // так как NativeModules часто read-only
+        Object.defineProperty(mod, method, {
+          value: function (...args) {
+            // setMode: блокируем только MODE_IN_COMMUNICATION (3)
+            if (method === "setMode" && args[0] !== 3) {
+              return original.apply(this, args);
+            }
+            log("Blocked " + moduleName + "." + method + "(" + args.join(", ") + ")");
+            return undefined;
+          },
+          configurable: true,
+          writable: true
+        });
 
-      // Store unpatch function
-      patches.push(function () {
-        mod[method] = original;
-      });
+        // Сохраняем функцию отката
+        patches.push(function () {
+          Object.defineProperty(mod, method, {
+            value: original,
+            configurable: true,
+            writable: true
+          });
+        });
 
-      patchCount++;
-      log("Patched " + moduleName + "." + method + " → no-op");
+        patchCount++;
+        log("Patched " + moduleName + "." + method + " → no-op");
+      } catch (err) {
+        log("Failed to patch " + moduleName + "." + method + ": " + err.message);
+      }
     }
   }
 
   log("Total patches applied: " + patchCount);
   if (patchCount === 0) {
     log(
-      "WARNING: No patches applied! Discord may have changed native module names. " +
-      "Check NativeModules keys in dev tools and open an issue if needed."
+      "WARNING: No patches applied! Discord may have changed native module names, " +
+      "or the objects are strictly frozen."
     );
   }
 }
