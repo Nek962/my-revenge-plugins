@@ -1,1 +1,1 @@
-
+{"name":"AudioFix","description":"Prevents BT A2DP→HFP switch on voice join","authors":[{"name":"me","id":"0"}],"main":"index.js"}
