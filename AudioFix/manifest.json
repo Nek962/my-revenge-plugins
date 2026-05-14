@@ -1,1 +1,7 @@
-{"name":"AudioFix","description":"Prevents BT A2DP→HFP switch on voice join","authors":[{"name":"me","id":"0"}],"main":"index.js"}
+{
+  "name": "AudioFix",
+  "description": "Prevents Discord from switching Bluetooth headphones to low-quality HFP/SCO mode during voice calls. Keeps A2DP (high-quality) audio mode.",
+  "authors": [{ "name": "you", "id": "0" }],
+  "main": "index.js",
+  "hash": ""
+}
